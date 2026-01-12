@@ -20,16 +20,23 @@ function AvatarCanvas({ isTalking = false }) {
       0.1,
       1000
     )
-    // Position camera to focus on face area (head is typically around y=1.5-1.8)
-    camera.position.set(0, 1.6, 1.2) // Closer and focused on face
-    camera.lookAt(0, 1.6, 0) // Look at face level
+    // Position camera to focus on center (will adjust after model loads)
+    camera.position.set(0, 0, 3) // Further back to see more
+    camera.lookAt(0, 0, 0) // Look at center
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-    renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight)
+    // Ensure we have valid dimensions
+    const width = mountRef.current.clientWidth || 800
+    const height = mountRef.current.clientHeight || 600
+    renderer.setSize(width, height)
     renderer.setPixelRatio(window.devicePixelRatio)
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     mountRef.current.appendChild(renderer.domElement)
+    
+    // Update camera aspect ratio
+    camera.aspect = width / height
+    camera.updateProjectionMatrix()
 
     // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
@@ -67,20 +74,46 @@ function AvatarCanvas({ isTalking = false }) {
           }
         })
 
-        // Center and scale the model if needed
+        // Get bounding box to understand model dimensions
         const box = new THREE.Box3().setFromObject(avatarModel)
         const center = box.getCenter(new THREE.Vector3())
         const size = box.getSize(new THREE.Vector3())
         
-        // Center the model
-        avatarModel.position.x = -center.x
-        avatarModel.position.y = -center.y
-        avatarModel.position.z = -center.z
-
-        // Scale to make face more prominent (larger scale for face focus)
+        // Scale first to get proper size
         const maxDimension = Math.max(size.x, size.y, size.z)
-        baseScale = maxDimension > 2 ? 2.5 / maxDimension : 1.2
+        baseScale = maxDimension > 2 ? 2.5 / maxDimension : 1.3
         avatarModel.scale.set(baseScale, baseScale, baseScale)
+        
+        // Recalculate bounding box after scaling
+        box.setFromObject(avatarModel)
+        const scaledCenter = box.getCenter(new THREE.Vector3())
+        const scaledSize = box.getSize(new THREE.Vector3())
+        
+        // Center the model at origin (0, 0, 0)
+        avatarModel.position.x = -scaledCenter.x
+        avatarModel.position.z = -scaledCenter.z
+        
+        // Position model so the head (top portion) is visible in center
+        // Move model up so head area is near y=0
+        // Head is typically at the top of the bounding box
+        const headY = box.max.y
+        // Position so head is slightly above center (y=0.3 to y=0.5)
+        const baseY = -headY + 0.4
+        avatarModel.position.y = baseY
+        avatarModel.position.x = -scaledCenter.x
+        avatarModel.position.z = -scaledCenter.z
+
+        // Store base position to keep avatar stable
+        sceneRef.current.basePosition = {
+          x: avatarModel.position.x,
+          y: baseY,
+          z: avatarModel.position.z
+        }
+
+        // Position camera to look at face area (head is now around y=0.4)
+        camera.position.set(0, 0.3, 2.0) // Look slightly down at face
+        camera.lookAt(0, 0.4, 0) // Look at head/face area
+        camera.updateProjectionMatrix()
 
         scene.add(avatarModel)
 
@@ -122,6 +155,8 @@ function AvatarCanvas({ isTalking = false }) {
     let animationId = null
     let baseRotationY = 0
     let talkingOffset = 0
+    let neutralHeadRotationX = 0
+    let neutralHeadRotationZ = 0
     
     const animate = () => {
       animationId = requestAnimationFrame(animate)
@@ -133,28 +168,44 @@ function AvatarCanvas({ isTalking = false }) {
         mixer.update(delta)
       }
       
-      if (avatarModel) {
-        // Talking animation: subtle head movements and scale changes
+      if (avatarModel && sceneRef.current.basePosition) {
+        // Keep position absolutely stable - no movement
+        avatarModel.position.x = sceneRef.current.basePosition.x
+        avatarModel.position.y = sceneRef.current.basePosition.y
+        avatarModel.position.z = sceneRef.current.basePosition.z
+        
+        // Natural talking animation: very subtle head movements only
         if (isTalking) {
-          talkingOffset += delta * 8 // Speed of talking animation
-          // Subtle head bobbing
-          avatarModel.rotation.y = baseRotationY + Math.sin(talkingOffset) * 0.05
-          avatarModel.rotation.x = Math.sin(talkingOffset * 0.7) * 0.02
-          // Subtle scale pulsing (mouth movement effect)
-          const scalePulse = 1 + Math.sin(talkingOffset * 2) * 0.02
-          avatarModel.scale.set(baseScale * scalePulse, baseScale * scalePulse, baseScale * scalePulse)
+          talkingOffset += delta * 3 // Slower, more natural speed
+          
+          // Very subtle head nod (only X rotation - up/down, like natural speech)
+          neutralHeadRotationX = Math.sin(talkingOffset * 1.2) * 0.01 // Very small, natural nod
+          
+          // Very subtle head tilt (Z rotation - left/right tilt, like listening)
+          neutralHeadRotationZ = Math.sin(talkingOffset * 0.6) * 0.008 // Very small tilt
+          
+          // Apply only subtle head rotations, keep body completely stable
+          avatarModel.rotation.x = neutralHeadRotationX
+          avatarModel.rotation.z = neutralHeadRotationZ
+          
+          // Keep Y rotation minimal (no turning/running effect)
+          avatarModel.rotation.y = baseRotationY
+          
+          // NO scale changes - keep size constant
+          avatarModel.scale.set(baseScale, baseScale, baseScale)
         } else {
           // Return to neutral position smoothly
-          baseRotationY += 0.002
+          baseRotationY += 0.001 // Very slow idle rotation
           avatarModel.rotation.y = baseRotationY
-          avatarModel.rotation.x = THREE.MathUtils.lerp(avatarModel.rotation.x, 0, 0.1)
-          // Reset scale smoothly
-          const currentScale = avatarModel.scale.x
-          const targetScale = baseScale
-          if (Math.abs(currentScale - targetScale) > 0.001) {
-            const newScale = THREE.MathUtils.lerp(currentScale, targetScale, 0.1)
-            avatarModel.scale.set(newScale, newScale, newScale)
-          }
+          
+          // Smoothly return head to neutral
+          neutralHeadRotationX = THREE.MathUtils.lerp(neutralHeadRotationX, 0, 0.2)
+          neutralHeadRotationZ = THREE.MathUtils.lerp(neutralHeadRotationZ, 0, 0.2)
+          avatarModel.rotation.x = neutralHeadRotationX
+          avatarModel.rotation.z = neutralHeadRotationZ
+          
+          // Ensure scale stays constant
+          avatarModel.scale.set(baseScale, baseScale, baseScale)
         }
       }
       
@@ -167,12 +218,19 @@ function AvatarCanvas({ isTalking = false }) {
 
     // Handle resize
     const handleResize = () => {
-      if (!mountRef.current) return
-      camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight
+      if (!mountRef.current || !renderer) return
+      const width = mountRef.current.clientWidth || 800
+      const height = mountRef.current.clientHeight || 600
+      camera.aspect = width / height
       camera.updateProjectionMatrix()
-      renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight)
+      renderer.setSize(width, height)
     }
     window.addEventListener('resize', handleResize)
+    
+    // Initial resize check after a short delay to ensure container is ready
+    setTimeout(() => {
+      handleResize()
+    }, 100)
 
     // Cleanup
     return () => {
@@ -193,18 +251,18 @@ function AvatarCanvas({ isTalking = false }) {
   }, [isTalking])
 
   return (
-    <div ref={mountRef} className="w-full h-full relative">
+    <div ref={mountRef} className="w-full h-full relative" style={{ minHeight: '400px' }}>
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded z-10">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-2"></div>
-            <p className="text-gray-500 text-sm">Loading Avatar...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-2"></div>
+            <p className="text-white text-sm">Loading Avatar...</p>
           </div>
         </div>
       )}
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded">
-          <p className="text-red-500 text-sm">{error}</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded z-10">
+          <p className="text-red-400 text-sm">{error}</p>
         </div>
       )}
     </div>

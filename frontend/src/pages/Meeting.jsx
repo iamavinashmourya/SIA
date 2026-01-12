@@ -278,7 +278,7 @@ function Meeting() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <main className="h-screen w-screen flex flex-col bg-gray-900 overflow-hidden">
       {/* End Meeting Overlay */}
       {showEndMeeting && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -297,143 +297,145 @@ function Meeting() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="w-full max-w-7xl mb-6">
-        <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-purple-500/30 p-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Sia - AI Meeting Assistant
-            </h1>
-            {roomName && (
-              <p className="text-sm text-gray-300 mt-1">Room: {roomName}</p>
+      {/* Top Bar - Minimal like Zoom/Meet */}
+      <div className="absolute top-0 left-0 right-0 z-10 bg-transparent">
+        <div className="flex justify-between items-center p-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+              <span className="text-white text-sm font-medium">{roomName || 'Meeting'}</span>
+            </div>
+            {isTalking && (
+              <div className="bg-green-500/90 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-2">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <span className="text-white text-xs font-medium">Sia is speaking</span>
+              </div>
             )}
           </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-300">
-              Participant: <span className="font-medium text-purple-300">{participantName}</span>
-            </p>
+          <div className="flex items-center gap-2">
+            <div className="bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+              <span className="text-white text-xs">{participantName}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content - Meeting Room Style */}
-      <div className="w-full max-w-7xl">
-        {/* Avatar Face Display - Large and Prominent */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl overflow-hidden border-2 border-purple-500/30">
-            <div className="aspect-video w-full relative" style={{ minHeight: '500px', maxHeight: '600px' }}>
-              <div className="absolute inset-0">
-                <AvatarCanvas isTalking={isTalking} />
-              </div>
-              {/* Talking indicator overlay */}
-              {isTalking && (
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-green-500/90 text-white px-4 py-2 rounded-full flex items-center gap-2 shadow-lg animate-pulse">
-                  <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-                  <span className="text-sm font-medium">Sia is speaking...</span>
-                </div>
-              )}
-            </div>
+      {/* Main Video/Avatar Area - Full Screen */}
+      <div className="flex-1 relative bg-black overflow-hidden">
+        {/* Avatar/Video Container - Centered */}
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div className="w-full h-full max-w-5xl relative" style={{ minHeight: '400px' }}>
+            <AvatarCanvas isTalking={isTalking} />
           </div>
         </div>
+        
+        {/* Participant Name Overlay (Bottom Left) */}
+        <div className="absolute bottom-20 left-4 bg-black/60 backdrop-blur-sm px-3 py-2 rounded-lg z-20">
+          <span className="text-white text-sm font-medium">Sia (AI Assistant)</span>
+        </div>
 
-        {/* Controls Panel */}
-        <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-purple-500/30 p-6">
-            {/* Recording Controls */}
-            <div className="mb-6">
-              <button
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isProcessing || isTalking}
-                className={`w-full py-4 px-6 rounded-xl font-semibold text-white transition-all transform hover:scale-105 disabled:hover:scale-100 disabled:opacity-50 ${
-                  isRecording
-                    ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/50'
-                    : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg shadow-indigo-500/50'
-                }`}
-              >
-                {isRecording ? '⏹ Stop Recording' : '🎤 Start Recording'}
-              </button>
-              
-              {isProcessing && (
-                <p className="text-center text-gray-300 mt-4 flex items-center justify-center gap-2">
-                  <span className="animate-spin">⏳</span>
-                  Processing your request...
-                </p>
-              )}
-            </div>
-
-            {/* AI Response Display */}
-            {aiResponse && (
-              <div className="mb-6 p-4 bg-gradient-to-r from-purple-900/50 to-indigo-900/50 rounded-lg border border-purple-500/30 max-h-64 overflow-y-auto">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
-                    S
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-purple-300 mb-2">Sia:</h3>
-                    <p className="text-gray-200 whitespace-pre-wrap leading-relaxed">{aiResponse}</p>
-                  </div>
-                </div>
+        {/* AI Response Chat Bubble (Bottom Right) */}
+        {aiResponse && (
+          <div className="absolute bottom-20 right-4 max-w-md bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-4 animate-slide-up z-20">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                S
               </div>
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1">Sia</div>
+                <p className="text-gray-800 text-sm leading-relaxed">{aiResponse}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Control Bar - Zoom/Meet Style */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700">
+        <div className="flex items-center justify-center gap-2 px-4 py-3">
+          {/* Microphone Toggle */}
+          <button
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={isProcessing || isTalking}
+            className={`flex items-center justify-center w-12 h-12 rounded-full transition-all ${
+              isRecording
+                ? 'bg-red-600 hover:bg-red-700 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            title={isRecording ? 'Mute' : 'Unmute'}
+          >
+            {isRecording ? (
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110.618 4v12a1 1 0 01-1.235.924l-4.5-1.125A1 1 0 014 14.825V5.175a1 1 0 01.883-.974l4.5-1.125z" clipRule="evenodd" />
+                <path d="M14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-1.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+              </svg>
             )}
+          </button>
 
-            {/* Status Indicator */}
-            <div className="mb-6 text-center">
-              <div className="inline-flex items-center space-x-2 px-4 py-2 bg-slate-700/50 rounded-full border border-purple-500/20">
-                <div
-                  className={`w-3 h-3 rounded-full transition-colors ${
-                    isRecording ? 'bg-red-500 animate-pulse' : 
-                    isTalking ? 'bg-green-500 animate-pulse' :
-                    isProcessing ? 'bg-yellow-500 animate-pulse' : 
-                    'bg-gray-400'
-                  }`}
-                />
-                <span className="text-sm text-gray-200 font-medium">
-                  {isRecording ? 'Recording...' : 
-                   isTalking ? 'Sia is speaking...' :
-                   isProcessing ? 'Processing...' : 
-                   'Ready'}
-                </span>
-              </div>
+          {/* Processing Indicator */}
+          {isProcessing && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-yellow-500/20 rounded-full">
+              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+              <span className="text-yellow-300 text-xs">Processing...</span>
             </div>
+          )}
 
-            {/* Call Host Button */}
-            <div className="mt-4">
-              <button
-                onClick={handleCallHost}
-                disabled={callingHost || (queueStatus && queueStatus.status === 'waiting')}
-                className={`w-full py-2 px-4 rounded-lg font-medium transition ${
-                  queueStatus && queueStatus.status === 'waiting'
-                    ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                    : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400'
-                }`}
-              >
-                {callingHost
-                  ? 'Requesting...'
-                  : queueStatus && queueStatus.status === 'waiting'
-                  ? `📞 In Queue (Position ${queueStatus.position})`
-                  : '📞 Call Host'}
-              </button>
-              {queueStatus && queueStatus.status === 'waiting' && (
-                <p className="text-xs text-center text-gray-600 mt-2">
-                  Waiting for host to respond...
-                </p>
-              )}
-            </div>
+          {/* Call Host Button */}
+          <button
+            onClick={handleCallHost}
+            disabled={callingHost || (queueStatus && queueStatus.status === 'waiting')}
+            className={`flex items-center justify-center w-12 h-12 rounded-full transition-all ${
+              queueStatus && queueStatus.status === 'waiting'
+                ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            title="Call Host"
+          >
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+            </svg>
+          </button>
 
-            {/* End Meeting Button */}
-            <div className="mt-4">
-              <button
-                onClick={() => {
-                  if (confirm('Are you sure you want to end the meeting?')) {
-                    handleEndMeeting();
-                  }
-                }}
-                className="w-full py-2 px-4 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/10 transition"
-              >
-                End Meeting
-              </button>
+          {/* Participants/Info Button */}
+          <button
+            className="flex items-center justify-center w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-all"
+            title="Meeting Info"
+          >
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+            </svg>
+          </button>
+
+          {/* End Call Button - Red and Prominent */}
+          <button
+            onClick={() => {
+              if (confirm('Are you sure you want to end the meeting?')) {
+                handleEndMeeting();
+              }
+            }}
+            className="flex items-center justify-center w-14 h-12 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-all font-medium px-4"
+            title="End Meeting"
+          >
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Queue Status Bar */}
+        {queueStatus && queueStatus.status === 'waiting' && (
+          <div className="px-4 pb-2">
+            <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg px-3 py-2 text-center">
+              <span className="text-yellow-300 text-xs">
+                In queue - Position {queueStatus.position} • Waiting for host...
+              </span>
             </div>
           </div>
-        </div>
+        )}
+      </div>
     </main>
   );
 }
