@@ -20,9 +20,9 @@ function AvatarCanvas({ isTalking = false }) {
       0.1,
       1000
     )
-    // Position camera to focus on center (will adjust after model loads)
-    camera.position.set(0, 0, 3) // Further back to see more
-    camera.lookAt(0, 0, 0) // Look at center
+    // Position camera directly in front, looking at center (will adjust after model loads)
+    camera.position.set(0, 0, 4) // Front-facing, further back for better view
+    camera.lookAt(0, 0, 0) // Look directly at center (face-on view)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     // Ensure we have valid dimensions
@@ -62,7 +62,7 @@ function AvatarCanvas({ isTalking = false }) {
     let baseScale = 1.0 // Store base scale for animation
 
     loader.load(
-      '/69624d032c16a23c58263de4.glb',
+      '/e8b2107f-3ad9-4d39-860d-4f50cd82a5d8.glb',
       (gltf) => {
         avatarModel = gltf.scene
         
@@ -103,16 +103,31 @@ function AvatarCanvas({ isTalking = false }) {
         avatarModel.position.x = -scaledCenter.x
         avatarModel.position.z = -scaledCenter.z
 
-        // Store base position to keep avatar stable
+        // Ensure avatar faces forward (front-facing, not side profile)
+        // If model is rotated in GLB, adjust rotation to face camera
+        avatarModel.rotation.y = 0 // Face directly forward (adjust if model is sideways)
+        avatarModel.rotation.x = 0 // No tilt
+        avatarModel.rotation.z = 0 // No side tilt
+        
+        // If the model appears sideways, try rotating 90 degrees:
+        // avatarModel.rotation.y = Math.PI / 2 // Uncomment if model faces wrong direction
+
+        // Store base position and rotation to keep avatar stable
         sceneRef.current.basePosition = {
           x: avatarModel.position.x,
           y: baseY,
           z: avatarModel.position.z
         }
+        sceneRef.current.baseRotation = {
+          x: 0,
+          y: 0, // Will be 0 for front-facing
+          z: 0
+        }
 
-        // Position camera to look at face area (head is now around y=0.4)
-        camera.position.set(0, 0.3, 2.0) // Look slightly down at face
-        camera.lookAt(0, 0.4, 0) // Look at head/face area
+        // Position camera directly in front to see face (front-facing view)
+        const faceY = baseY + (headY - scaledCenter.y) * baseScale // Calculate face Y position
+        camera.position.set(0, faceY * 0.8, 3.5) // Front-facing, slightly above, back enough to see full face
+        camera.lookAt(0, faceY, 0) // Look directly at face area
         camera.updateProjectionMatrix()
 
         scene.add(avatarModel)
@@ -153,7 +168,6 @@ function AvatarCanvas({ isTalking = false }) {
 
     // Animation loop
     let animationId = null
-    let baseRotationY = 0
     let talkingOffset = 0
     let neutralHeadRotationX = 0
     let neutralHeadRotationZ = 0
@@ -169,7 +183,7 @@ function AvatarCanvas({ isTalking = false }) {
       }
       
       if (avatarModel && sceneRef.current.basePosition) {
-        // Keep position absolutely stable - no movement
+        // Keep position absolutely stable - no movement, always centered
         avatarModel.position.x = sceneRef.current.basePosition.x
         avatarModel.position.y = sceneRef.current.basePosition.y
         avatarModel.position.z = sceneRef.current.basePosition.z
@@ -184,25 +198,38 @@ function AvatarCanvas({ isTalking = false }) {
           // Very subtle head tilt (Z rotation - left/right tilt, like listening)
           neutralHeadRotationZ = Math.sin(talkingOffset * 0.6) * 0.008 // Very small tilt
           
-          // Apply only subtle head rotations, keep body completely stable
-          avatarModel.rotation.x = neutralHeadRotationX
-          avatarModel.rotation.z = neutralHeadRotationZ
-          
-          // Keep Y rotation minimal (no turning/running effect)
-          avatarModel.rotation.y = baseRotationY
+          // Apply only subtle head rotations on top of base rotation, keep body completely stable
+          if (sceneRef.current.baseRotation) {
+            avatarModel.rotation.x = sceneRef.current.baseRotation.x + neutralHeadRotationX
+            avatarModel.rotation.z = sceneRef.current.baseRotation.z + neutralHeadRotationZ
+            avatarModel.rotation.y = sceneRef.current.baseRotation.y // Always face forward (0)
+          } else {
+            avatarModel.rotation.x = neutralHeadRotationX
+            avatarModel.rotation.z = neutralHeadRotationZ
+            avatarModel.rotation.y = 0
+          }
           
           // NO scale changes - keep size constant
           avatarModel.scale.set(baseScale, baseScale, baseScale)
         } else {
-          // Return to neutral position smoothly
-          baseRotationY += 0.001 // Very slow idle rotation
-          avatarModel.rotation.y = baseRotationY
+          // Completely stable - face forward, no rotation when not talking
+          if (sceneRef.current.baseRotation) {
+            avatarModel.rotation.y = sceneRef.current.baseRotation.y // Always face forward (0)
+            avatarModel.rotation.x = sceneRef.current.baseRotation.x // No base tilt
+            avatarModel.rotation.z = sceneRef.current.baseRotation.z // No base side tilt
+          } else {
+            avatarModel.rotation.y = 0 // Always face forward, no rotation
+            avatarModel.rotation.x = 0
+            avatarModel.rotation.z = 0
+          }
           
-          // Smoothly return head to neutral
+          // Smoothly return head to neutral (only talking animations)
           neutralHeadRotationX = THREE.MathUtils.lerp(neutralHeadRotationX, 0, 0.2)
           neutralHeadRotationZ = THREE.MathUtils.lerp(neutralHeadRotationZ, 0, 0.2)
-          avatarModel.rotation.x = neutralHeadRotationX
-          avatarModel.rotation.z = neutralHeadRotationZ
+          
+          // Apply only subtle talking head movements on top of base rotation
+          avatarModel.rotation.x = (sceneRef.current.baseRotation?.x || 0) + neutralHeadRotationX
+          avatarModel.rotation.z = (sceneRef.current.baseRotation?.z || 0) + neutralHeadRotationZ
           
           // Ensure scale stays constant
           avatarModel.scale.set(baseScale, baseScale, baseScale)
